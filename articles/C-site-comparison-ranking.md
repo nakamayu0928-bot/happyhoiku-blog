@@ -9,7 +9,7 @@ keywords:
   - "保育士 転職 サイト ランキング"
 priority: 最高
 phase: Tier1
-status: 未着手
+status: 公開済み
 writer: ""
 reviewer: ""
 write_period: "9/10〜9/19"
