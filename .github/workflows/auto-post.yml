@@ -1,0 +1,49 @@
+name: 記事の自動投稿
+
+on:
+  schedule:
+    # 月・水・金の朝 7:03（日本時間）= 前日 22:03（UTC）
+    - cron: "3 22 * * 0,2,4"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "投稿せずに生成結果だけ確認する"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-post
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: 記事を生成して投稿
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          WP_URL: ${{ secrets.WP_URL }}
+          WP_USER: ${{ secrets.WP_USER }}
+          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          WP_POST_STATUS: ${{ vars.WP_POST_STATUS }}
+          WP_CATEGORY_ID: ${{ vars.WP_CATEGORY_ID }}
+        run: python scripts/auto_post.py ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: 使ったテーマと投稿履歴を保存
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add content/
+          git diff --cached --quiet || git commit -m "記事を投稿: $(tail -n 1 content/posted.tsv | cut -f3)"
+          git push
