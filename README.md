@@ -1,6 +1,6 @@
 # happyhoiku-blog
 
-Claude（AI）が保育ブログの記事を書き、WordPress に **月・水・金の朝7時（日本時間）** に自動投稿します。
+Claude（AI）が保育ブログの記事を書き、WordPress に **毎朝7時（日本時間）** に自動投稿します。
 
 ## しくみ
 

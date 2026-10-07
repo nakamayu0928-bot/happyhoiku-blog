@@ -2,8 +2,8 @@ name: 記事の自動投稿
 
 on:
   schedule:
-    # 月・水・金の朝 7:03（日本時間）= 前日 22:03（UTC）
-    - cron: "3 22 * * 0,2,4"
+    # 毎日 朝 7:03（日本時間）= 前日 22:03（UTC）
+    - cron: "3 22 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
