@@ -1,15 +1,16 @@
 # happyhoiku-blog
 
-Claude（AI）が保育ブログの記事を書き、WordPress に **毎朝7時（日本時間）** に自動投稿します。
+Claude（AI）が保育士転職ブログ（happyhoiku-tenshoku.com）の記事を書き、WordPress に **毎朝7時（日本時間）** に自動投稿します。
 
 ## しくみ
 
 1. GitHub Actions が決まった時間に `scripts/auto_post.py` を実行します
-2. `content/topics.txt` の一番上のテーマで、`content/blog_profile.md` の方針に沿って Claude が記事を書きます
-3. WordPress の REST API で投稿します（タグも自動で付きます）
-4. 使ったテーマは `topics.txt` から消え、`content/posted.tsv` に投稿履歴が残ります
+2. `content/keywords.csv`（KW選定シート）から、`執筆済み` が空のキーワードを **優先度の高い順（最高→高→中）** に1つ選びます
+3. そのキーワードの検索意図・推奨記事タイプ・備考と、`content/blog_profile.md` の方針に沿って Claude が記事を書きます。既存記事への内部リンクも入れます
+4. WordPress の REST API で投稿します（タグも自動で付きます）
+5. `keywords.csv` の `執筆済み` に日付、`URL` に記事URLが入り、`content/posted.tsv` に投稿履歴が残ります
 
-テーマが空になったら、AI が過去記事と重ならないテーマを自分で選びます。
+未執筆のキーワードがなくなったら、AI が既存記事と重ならないテーマを自分で選びます。
 
 ## 初期設定
 
@@ -45,7 +46,8 @@ https://platform.claude.com/ で API キーを発行します（記事1本あた
 
 ## 日々の使い方
 
-- **書いてほしいテーマを追加** → `content/topics.txt` に1行ずつ追記
+- **キーワードを追加** → スプレッドシートに行を足したら CSV で書き出し、`content/keywords.csv` を置き換える（`執筆済み` と `URL` 列はそのまま残してください）
+- **紹介サービスの情報を追加** → `content/blog_profile.md` の「紹介するサービス」に確認済みの事実と紹介リンクを書く
 - **記事の雰囲気を変える** → `content/blog_profile.md` を編集
 - **投稿の曜日・時間を変える** → `.github/workflows/auto-post.yml` の `cron` を編集（時刻は UTC = 日本時間 − 9時間）
 

@@ -1,6 +1,8 @@
 """Claude で記事を書き、WordPress に自動投稿するスクリプト。
 
 使い方:
+キーワードは content/keywords.csv から、執筆済みでないものを優先度の高い順に1つ選びます。
+
     python scripts/auto_post.py            # 記事を生成して投稿
     python scripts/auto_post.py --dry-run  # 生成だけして投稿しない（中身を確認したいとき）
 
@@ -15,6 +17,7 @@
 """
 
 import argparse
+import csv
 import datetime
 import os
 import sys
@@ -26,11 +29,12 @@ from pydantic import BaseModel
 
 ROOT = Path(__file__).resolve().parent.parent
 PROFILE_FILE = ROOT / "content" / "blog_profile.md"
-TOPICS_FILE = ROOT / "content" / "topics.txt"
+KEYWORDS_FILE = ROOT / "content" / "keywords.csv"
 POSTED_FILE = ROOT / "content" / "posted.tsv"
 
 MODEL = "claude-opus-5-5"
 JST = datetime.timezone(datetime.timedelta(hours=9))
+PRIORITY_ORDER = {"最高": 0, "高": 1, "中": 2, "低": 3}
 
 
 class Article(BaseModel):
@@ -41,53 +45,77 @@ class Article(BaseModel):
     tags: list[str]
 
 
-def read_topics() -> tuple[list[str], str | None]:
-    lines = TOPICS_FILE.read_text(encoding="utf-8").splitlines()
-    for line in lines:
-        if line.strip() and not line.lstrip().startswith("#"):
-            return lines, line.strip()
-    return lines, None
+def read_keywords() -> tuple[list[str], list[dict]]:
+    with KEYWORDS_FILE.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        return list(reader.fieldnames), list(reader)
 
 
-def remove_topic(lines: list[str], topic: str) -> None:
-    for i, line in enumerate(lines):
-        if line.strip() == topic:
-            del lines[i]
-            break
-    TOPICS_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+def write_keywords(fields: list[str], rows: list[dict]) -> None:
+    with KEYWORDS_FILE.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
 
 
-def past_titles() -> list[str]:
-    rows = POSTED_FILE.read_text(encoding="utf-8").splitlines()[1:]
-    return [row.split("\t")[2] for row in rows if row.count("\t") >= 3]
+def pick_keyword(rows: list[dict]) -> dict | None:
+    todo = [r for r in rows if r["KW"].strip() and not r["執筆済み"].strip()]
+    todo.sort(key=lambda r: PRIORITY_ORDER.get(r["優先度"].strip(), 9))
+    return todo[0] if todo else None
 
 
-def generate_article(topic: str | None) -> Article:
+def existing_articles(rows: list[dict]) -> list[str]:
+    """既存記事の一覧（内部リンクと重複回避に使う）。"""
+    articles = []
+    for row in POSTED_FILE.read_text(encoding="utf-8").splitlines()[1:]:
+        cols = row.split("\t")
+        if len(cols) >= 4:
+            articles.append(f"- {cols[2]}（KW: {cols[1]}）: {cols[3]}")
+    posted_kws = {a.split("KW: ")[1].split("）")[0] for a in articles}
+    for r in rows:
+        if r["執筆済み"].strip() and r["KW"] not in posted_kws:
+            url = r.get("URL", "").strip()
+            # 下書きのプレビュー URL は公開されていないのでリンクに使わない
+            link = url if url and "preview" not in url else "（URL不明）"
+            articles.append(f"- KW: {r['KW']}: {link}")
+    return articles
+
+
+def generate_article(kw: dict | None, rows: list[dict]) -> Article:
     profile = PROFILE_FILE.read_text(encoding="utf-8")
-    titles = past_titles()
-    history = "\n".join(f"- {t}" for t in titles[-100:]) or "（まだありません）"
+    history = "\n".join(existing_articles(rows)[-100:]) or "（まだありません）"
 
-    if topic:
-        task = f"次のテーマでブログ記事を1本書いてください。\n\nテーマ: {topic}"
+    if kw:
+        task = f"""次のキーワードで検索上位を狙うブログ記事を1本書いてください。
+
+- メインキーワード: {kw["KW"]}
+- 想定検索意図: {kw["想定検索意図"]}
+- 推奨記事タイプ: {kw["推奨記事タイプ"]}
+- 読者（ペルソナ）との一致度: {kw["読者との一致度"]}
+- 申し込み（CV）への近さ: {kw["CVへの近さ"]}
+- 編集メモ: {kw["備考"]}
+
+検索した人の疑問に最初から最後まで答えきる内容にし、メインキーワードはタイトル・導入文・見出しに自然に含めてください。"""
     else:
-        task = "ブログの方針に合ったテーマを自分で1つ選び、ブログ記事を1本書いてください。過去の記事とテーマが重ならないようにしてください。"
+        task = "ブログの方針に合ったテーマを自分で1つ選び、ブログ記事を1本書いてください。既存の記事とテーマが重ならないようにしてください。"
 
     prompt = f"""{task}
 
-## 過去に投稿した記事のタイトル
+## このブログの既存記事
+内容が重ならないようにし、関連する記事で URL がわかるものは本文中で自然に内部リンク（<a href>）してください。
 {history}
 
 ## 出力の形式
 - title: 検索されやすく、読みたくなる日本語タイトル（32文字前後）
 - slug: URL 用の短い英小文字とハイフンの文字列（例: rainy-day-indoor-play）
 - excerpt: 記事の要約（120文字以内）
-- content_html: 記事本文の HTML。<h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong> のみ使う。<h1> とタイトルは含めない。導入→本文（見出しで区切る）→まとめ の構成にする
+- content_html: 記事本文の HTML。<h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <a>, <table>, <tr>, <th>, <td> のみ使う。<h1> とタイトルは含めない。導入→本文（見出しで区切る）→まとめ の構成にする
 - tags: 記事に合うタグを3〜5個"""
 
     client = anthropic.Anthropic()
-    response = client.messages.parse(
+    with client.messages.stream(
         model=MODEL,
-        max_tokens=16000,
+        max_tokens=64000,
         system=f"あなたは保育ブログの記事を書くライターです。以下のブログ方針に従ってください。\n\n{profile}",
         messages=[{"role": "user", "content": prompt}],
         output_format=Article,
@@ -95,7 +123,8 @@ def generate_article(topic: str | None) -> Article:
         # 安全フィルターで断られたときに、別のモデルで自動的に書き直してもらう
         extra_headers={"anthropic-beta": "server-side-fallback-2026-07-01"},
         extra_body={"fallbacks": "default"},
-    )
+    ) as stream:
+        response = stream.get_final_message()
     if response.stop_reason == "refusal":
         sys.exit("記事の生成が断られました。テーマを変えて再度お試しください。")
     if response.stop_reason == "max_tokens":
@@ -152,9 +181,10 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="投稿せずに生成結果を表示する")
     args = parser.parse_args()
 
-    lines, topic = read_topics()
-    print(f"テーマ: {topic or '（AIにおまかせ）'}")
-    article = generate_article(topic)
+    fields, rows = read_keywords()
+    kw = pick_keyword(rows)
+    print(f"キーワード: {kw['KW'] if kw else '（未執筆のキーワードがないためAIにおまかせ）'}")
+    article = generate_article(kw, rows)
     print(f"タイトル: {article.title}")
 
     if args.dry_run:
@@ -165,11 +195,13 @@ def main() -> None:
     url = post_to_wordpress(article)
     print(f"投稿しました: {url}")
 
-    if topic:
-        remove_topic(lines, topic)
     today = datetime.datetime.now(JST).strftime("%Y-%m-%d")
+    if kw:
+        kw["執筆済み"] = f"✓ {today}"
+        kw["URL"] = url
+        write_keywords(fields, rows)
     with POSTED_FILE.open("a", encoding="utf-8") as f:
-        f.write(f"{today}\t{topic or '(auto)'}\t{article.title}\t{url}\n")
+        f.write(f"{today}\t{kw['KW'] if kw else '(auto)'}\t{article.title}\t{url}\n")
 
 
 if __name__ == "__main__":
