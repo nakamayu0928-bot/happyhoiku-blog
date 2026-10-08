@@ -35,6 +35,7 @@ from images import find_photo, make_eyecatch
 
 ROOT = Path(__file__).resolve().parent.parent
 PROFILE_FILE = ROOT / "content" / "blog_profile.md"
+VOICES_FILE = ROOT / "content" / "reader_voices.md"
 KEYWORDS_FILE = ROOT / "content" / "keywords.csv"
 POSTED_FILE = ROOT / "content" / "posted.tsv"
 PREVIEW_DIR = ROOT / "preview"
@@ -100,6 +101,8 @@ def existing_articles(rows: list[dict]) -> list[str]:
 
 def generate_article(kw: dict | None, rows: list[dict]) -> Article:
     profile = PROFILE_FILE.read_text(encoding="utf-8")
+    if VOICES_FILE.exists():
+        profile += "\n\n" + VOICES_FILE.read_text(encoding="utf-8")
     history = "\n".join(existing_articles(rows)[-100:]) or "（まだありません）"
 
     if kw:
