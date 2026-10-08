@@ -23,6 +23,7 @@ import datetime
 import os
 import sys
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlparse
 
 import anthropic
@@ -54,6 +55,9 @@ class Article(BaseModel):
     content_html: str
     tags: list[str]
     images: list[ImageSpec]
+    eyecatch_copy: str
+    eyecatch_label: str
+    illustration: Literal["mom_and_kids", "tired_night", "teacher", "checklist", "step_forward"]
 
 
 def read_keywords() -> tuple[list[str], list[dict]]:
@@ -119,18 +123,29 @@ def generate_article(kw: dict | None, rows: list[dict]) -> Article:
 ## 出力の形式
 - title: 検索されやすく、読みたくなる日本語タイトル（32文字前後）
 - slug: URL 用の短い英小文字とハイフンの文字列（例: rainy-day-indoor-play）
-- excerpt: 記事の要約（120文字以内）
+- excerpt: メタディスクリプション兼要約。メインキーワードを前半に入れ、読むと何がわかるかを100〜120文字で
 - content_html: 記事本文の HTML。<h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <a>, <table>, <tr>, <th>, <td> のみ使う。<h1> とタイトルは含めない。導入→本文（見出しで区切る）→まとめ の構成にする
 - tags: 記事に合うタグを3〜5個
 - images: 本文に入れる写真を2〜3枚。content_html の中で写真を入れたい位置（主な <h2> の直後など）に <p>[[画像1]]</p>, <p>[[画像2]]</p> … と書き、同じ順番で images に指定する
   - search_query: 無料写真サイトで探すための英語の検索語（例: "tired mother with child", "nursery school teacher"）。人物の顔がはっきり写る写真に頼らず、雰囲気が伝わるものを選ぶ
-  - alt: 写真の説明（日本語・30文字以内）"""
+  - alt: 写真の説明（日本語・30文字以内）
+- eyecatch_copy: アイキャッチ画像に大きく入れる短いキャッチコピー。2行で、改行位置に「／」を入れる。1行10文字前後まで（例: 子持ち保育士の転職／勇気が出ない人へ）
+- eyecatch_label: アイキャッチ左上の小さなラベル（8文字以内。例: 保育士の転職、比較、悩み相談）
+- illustration: アイキャッチのイラスト。記事に一番合うものを選ぶ
+  - mom_and_kids: ママと2人の子ども（子育てとの両立・子持ち・ワーママ）
+  - tired_night: 夜にスマホを見て悩む女性（悩み・不安・疲れ・迷い）
+  - teacher: エプロン姿の保育士と子ども（保育の仕事・職場・人間関係）
+  - checklist: チェックリストを持つ女性（比較・選び方・方法・流れ・ノウハウ）
+  - step_forward: 前に踏み出す女性（成功・前向き・タイミング・背中を押す）"""
 
     client = anthropic.Anthropic()
     with client.messages.stream(
         model=MODEL,
         max_tokens=64000,
-        system=f"あなたは保育ブログの記事を書くライターです。以下のブログ方針に従ってください。\n\n{profile}",
+        system=(
+            "あなたは保育士転職ブログの記事を書く、SEOに強いプロのWebディレクター兼ライターです。"
+            f"以下のブログ方針と SEO ルールに従ってください。\n\n{profile}"
+        ),
         messages=[{"role": "user", "content": prompt}],
         output_format=Article,
         output_config={"effort": "medium"},
@@ -219,7 +234,7 @@ def site_name() -> str:
 
 def post_to_wordpress(article: Article) -> dict:
     eyecatch = upload_media(
-        make_eyecatch(article.title, site_name(), article.slug),
+        make_eyecatch(article.eyecatch_copy, article.eyecatch_label, article.illustration, site_name()),
         f"{article.slug}-eyecatch.png",
         "image/png",
         article.title,
@@ -245,7 +260,9 @@ def post_to_wordpress(article: Article) -> dict:
 
 def save_preview(article: Article) -> None:
     PREVIEW_DIR.mkdir(exist_ok=True)
-    (PREVIEW_DIR / "eyecatch.png").write_bytes(make_eyecatch(article.title, site_name(), article.slug))
+    (PREVIEW_DIR / "eyecatch.png").write_bytes(
+        make_eyecatch(article.eyecatch_copy, article.eyecatch_label, article.illustration, site_name())
+    )
     body = insert_photos(article, upload=False)
     (PREVIEW_DIR / "article.html").write_text(
         f"""<!doctype html><meta charset="utf-8"><title>{article.title}</title>

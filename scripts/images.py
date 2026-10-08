@@ -1,12 +1,11 @@
 """記事に付ける画像の作成・取得。
 
-- アイキャッチ: 記事タイトル入りの画像をその場で作る（追加の設定は不要）
+- アイキャッチ: キャッチコピーとイラスト（illustrations.py）を組み合わせて作る（追加の設定は不要）
 - 本文の写真: PEXELS_API_KEY があれば Pexels の無料写真を探して使う
 """
 
 import io
 import os
-import random
 import re
 import textwrap
 from pathlib import Path
@@ -17,70 +16,84 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parent.parent
 USED_PHOTOS_FILE = ROOT / "content" / "used_photos.txt"
 
-FONT_CANDIDATES = [
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf",
-    "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",
-    "/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc",
-    "C:/Windows/Fonts/meiryob.ttc",
-]
+FONT_DIR = ROOT / "assets" / "fonts"
 
-# やさしい印象の背景色とアクセント色の組み合わせ
-PALETTES = [
-    ("#FFF4E8", "#F28C6B"),
-    ("#EEF7F1", "#5BAE85"),
-    ("#FDF0F4", "#E07A9A"),
-    ("#EEF4FB", "#5B8FD1"),
-    ("#FFF9E6", "#E5A82E"),
-]
+# イラストごとの背景色とアクセント色
+THEMES = {
+    "mom_and_kids": ("#FFF3EC", "#F28C6B"),
+    "tired_night": ("#EEF1FA", "#5B6FA8"),
+    "teacher": ("#EFF8F2", "#4FA27A"),
+    "checklist": ("#EEF4FB", "#4F86C9"),
+    "step_forward": ("#FFF8E8", "#E8913A"),
+}
 
 
-def _font(size: int) -> ImageFont.FreeTypeFont:
-    for path in FONT_CANDIDATES:
-        if Path(path).exists():
-            return ImageFont.truetype(path, size)
-    raise RuntimeError("日本語フォントが見つかりません（fonts-noto-cjk をインストールしてください）")
+def _font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+    name = "ZenMaruGothic-Bold.ttf" if bold else "ZenMaruGothic-Medium.ttf"
+    return ImageFont.truetype(str(FONT_DIR / name), size)
 
 
-def make_eyecatch(title: str, site_name: str, seed: str) -> bytes:
-    """タイトル入りのアイキャッチ画像（1200x630 PNG）を作る。"""
-    rnd = random.Random(seed)
-    bg, accent = rnd.choice(PALETTES)
+def _illustration_png(name: str, size: int) -> Image.Image:
+    import cairosvg
+
+    from illustrations import ILLUSTRATIONS
+
+    svg = ILLUSTRATIONS.get(name, ILLUSTRATIONS["mom_and_kids"])()
+    png = cairosvg.svg2png(bytestring=svg.encode(), output_width=size, output_height=size)
+    return Image.open(io.BytesIO(png)).convert("RGBA")
+
+
+def make_eyecatch(copy: str, label: str, illustration: str, site_name: str) -> bytes:
+    """キャッチコピーとイラストのアイキャッチ画像（1200x630 PNG）を作る。
+
+    copy は「／」で改行位置を指定できる（例: 子持ち保育士の転職／勇気が出ない人へ）。
+    """
+    bg, accent = THEMES.get(illustration, THEMES["mom_and_kids"])
     w, h = 1200, 630
-    img = Image.new("RGB", (w, h), bg)
+    img = Image.new("RGBA", (w, h), bg)
     draw = ImageDraw.Draw(img)
 
-    # 背景の水玉
-    for _ in range(14):
-        r = rnd.randint(30, 110)
-        x, y = rnd.randint(-50, w + 50), rnd.randint(-50, h + 50)
-        draw.ellipse((x - r, y - r, x + r, y + r), fill=_mix(bg, accent, 0.18))
+    # 背景の飾り
+    draw.ellipse((-120, 430, 260, 810), fill=_mix(bg, accent, 0.10))
+    draw.ellipse((560, -160, 820, 100), fill=_mix(bg, accent, 0.08))
+    for x, y, r in ((610, 520, 10), (90, 80, 7), (640, 120, 6)):
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=_mix(bg, accent, 0.35))
 
-    # 中央の白いカード
-    margin = 70
-    draw.rounded_rectangle((margin, margin, w - margin, h - margin), radius=36, fill="white")
-    draw.rounded_rectangle((margin, margin, w - margin, margin + 14), radius=7, fill=accent)
+    # イラスト（右側）
+    ill = _illustration_png(illustration, 540)
+    img.alpha_composite(ill, (w - 540 - 30, (h - 540) // 2 + 10))
 
-    # タイトル（長さに合わせて文字サイズと折り返しを調整）
-    for size in (64, 58, 52, 46, 40):
+    # ラベル（左上のバッジ）
+    left, text_w = 70, 600
+    label_font = _font(30)
+    if label:
+        lw = draw.textlength(label, font=label_font)
+        draw.rounded_rectangle((left, 80, left + lw + 48, 132), radius=26, fill=accent)
+        draw.text((left + 24, 88), label, font=label_font, fill="white")
+
+    # キャッチコピー（大きく、マーカー付き）
+    lines = [l for l in copy.replace("/", "／").split("／") if l] or [copy]
+    if len(lines) == 1:
+        lines = _wrap(copy, 10)
+    for size in (84, 76, 68, 60, 54, 48):
         font = _font(size)
-        per_line = (w - margin * 2 - 100) // size
-        lines = _wrap(title, per_line)
-        if len(lines) <= 3:
+        if max(draw.textlength(l, font=font) for l in lines) <= text_w and len(lines) * size * 1.5 <= 330:
             break
-    line_h = int(size * 1.45)
-    top = (h - line_h * len(lines)) // 2 - 20
+    line_h = int(size * 1.5)
+    top = 165 + (330 - line_h * len(lines)) // 2
+    marker = _mix("#FFFFFF", "#FFE066", 0.85)
     for i, line in enumerate(lines):
+        y = top + i * line_h
         tw = draw.textlength(line, font=font)
-        draw.text(((w - tw) / 2, top + i * line_h), line, font=font, fill="#3A3A3A")
+        draw.rounded_rectangle((left - 6, y + size * 0.62, left + tw + 6, y + size * 1.08), radius=8, fill=marker)
+        draw.text((left, y), line, font=font, fill="#3B3330")
 
-    small = _font(28)
-    sw = draw.textlength(site_name, font=small)
-    draw.text(((w - sw) / 2, h - margin - 70), site_name, font=small, fill=accent)
+    # サイト名（左下）
+    small = _font(24, bold=False)
+    draw.text((left, h - 75), site_name, font=small, fill=_mix("#3B3330", bg, 0.35))
 
     buf = io.BytesIO()
-    img.save(buf, "PNG", optimize=True)
+    img.convert("RGB").save(buf, "PNG", optimize=True)
     return buf.getvalue()
 
 
