@@ -29,6 +29,9 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: 日本語フォントを入れる（アイキャッチ画像用）
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk
+
       - name: 記事を生成して投稿
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -37,9 +40,17 @@ jobs:
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
           WP_POST_STATUS: ${{ vars.WP_POST_STATUS }}
           WP_CATEGORY_ID: ${{ vars.WP_CATEGORY_ID }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: python scripts/auto_post.py ${{ inputs.dry_run && '--dry-run' || '' }}
 
-      - name: 使ったテーマと投稿履歴を保存
+      - name: 確認用の記事と画像を保存
+        if: ${{ inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview
+          path: preview/
+
+      - name: 使ったキーワードと投稿履歴を保存
         if: ${{ !inputs.dry_run }}
         run: |
           git config user.name "github-actions[bot]"
