@@ -1,6 +1,7 @@
 """記事に付ける画像の作成・取得。
 
-- アイキャッチ: キャッチコピーとイラスト（illustrations.py）を組み合わせて作る（追加の設定は不要）
+- アイキャッチ: キャッチコピー＋写真風画像。GEMINI_API_KEY があれば Google の画像生成 AI で作り、
+  なければ Pexels の写真、それもなければイラスト（illustrations.py）を使う
 - 本文の写真: PEXELS_API_KEY があれば Pexels の無料写真を探して使う
 """
 
@@ -43,11 +44,87 @@ def _illustration_png(name: str, size: int) -> Image.Image:
     return Image.open(io.BytesIO(png)).convert("RGBA")
 
 
-def make_eyecatch(copy: str, label: str, illustration: str, site_name: str) -> bytes:
-    """キャッチコピーとイラストのアイキャッチ画像（1200x630 PNG）を作る。
+# AI に写真風の画像を作らせるときに毎回付ける指定
+PHOTO_STYLE = (
+    "Photorealistic lifestyle photograph of Japanese people, natural soft daylight, warm and gentle tones, "
+    "shallow depth of field, shot on a full-frame camera with a 50mm lens, high quality stock photo. "
+    "Place the main subject on the right half of the frame; keep the left half a calm, softly blurred, "
+    "uncluttered background. No text, no letters, no logos, no watermarks."
+)
+EYECATCH_ACCENT = "#F28C6B"
 
+
+def generate_ai_photo(scene: str) -> bytes | None:
+    """Google の画像生成 AI で写真風の画像を作る。GEMINI_API_KEY がないときは None。"""
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key:
+        return None
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=key)
+    model = os.environ.get("GEMINI_IMAGE_MODEL") or "imagen-4.0-generate-001"
+    # 子どもが写る場面もあるので ALLOW_ALL を先に試し、使えない地域・設定なら大人のみで作り直す
+    for person in ("ALLOW_ALL", "ALLOW_ADULT"):
+        try:
+            res = client.models.generate_images(
+                model=model,
+                prompt=f"{scene}. {PHOTO_STYLE}",
+                config=types.GenerateImagesConfig(
+                    number_of_images=1, aspect_ratio="16:9", person_generation=person
+                ),
+            )
+        except Exception as e:  # 設定や地域の制限で断られたら次を試す
+            print(f"AI画像の生成に失敗しました（{person}）: {e}")
+            continue
+        for generated in res.generated_images or []:
+            if generated.image and generated.image.image_bytes:
+                return generated.image.image_bytes
+        print(f"AI画像が安全フィルターで除外されました（{person}）")
+    return None
+
+
+def make_eyecatch(copy: str, label: str, site_name: str, scene: str = "",
+                  photo_query: str = "", illustration: str = "mom_and_kids") -> bytes:
+    """アイキャッチ画像（1200x630 PNG）を作る。
+
+    AI の写真風画像 → Pexels の写真 → イラスト の順に、用意できたものを使う。
     copy は「／」で改行位置を指定できる（例: 子持ち保育士の転職／勇気が出ない人へ）。
     """
+    photo = generate_ai_photo(scene) if scene else None
+    if not photo and photo_query:
+        found = find_photo(photo_query)
+        photo = found["bytes"] if found else None
+    if photo:
+        return _photo_eyecatch(photo, copy, label, site_name)
+    return _illustration_eyecatch(copy, label, illustration, site_name)
+
+
+def _photo_eyecatch(photo: bytes, copy: str, label: str, site_name: str) -> bytes:
+    w, h = 1200, 630
+    src = Image.open(io.BytesIO(photo)).convert("RGB")
+    scale = max(w / src.width, h / src.height)
+    src = src.resize((round(src.width * scale), round(src.height * scale)), Image.LANCZOS)
+    left_crop = (src.width - w) // 2
+    img = src.crop((left_crop, (src.height - h) // 2, left_crop + w, (src.height - h) // 2 + h)).convert("RGBA")
+
+    # 文字を読みやすくするため、左側を白くぼかす
+    fade = Image.new("L", (w, h))
+    fd = ImageDraw.Draw(fade)
+    for x in range(w):
+        t = max(0.0, 1 - x / 780)
+        fd.line((x, 0, x, h), fill=round(238 * min(1.0, t * 1.35)))
+    white = Image.new("RGBA", (w, h), (255, 255, 255, 255))
+    img = Image.composite(white, img, fade)
+
+    draw = ImageDraw.Draw(img)
+    _draw_copy(draw, copy, label, site_name, EYECATCH_ACCENT, "#FFFFFF", h, text_w=600)
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+
+def _illustration_eyecatch(copy: str, label: str, illustration: str, site_name: str) -> bytes:
     bg, accent = THEMES.get(illustration, THEMES["mom_and_kids"])
     w, h = 1200, 630
     img = Image.new("RGBA", (w, h), bg)
@@ -59,19 +136,23 @@ def make_eyecatch(copy: str, label: str, illustration: str, site_name: str) -> b
     for x, y, r in ((610, 520, 10), (90, 80, 7), (640, 120, 6)):
         draw.ellipse((x - r, y - r, x + r, y + r), fill=_mix(bg, accent, 0.35))
 
-    # イラスト（右側）
     ill = _illustration_png(illustration, 540)
     img.alpha_composite(ill, (w - 540 - 30, (h - 540) // 2 + 10))
 
-    # ラベル（左上のバッジ）
-    left, text_w = 70, 600
+    _draw_copy(draw, copy, label, site_name, accent, bg, h, text_w=600)
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+
+def _draw_copy(draw, copy, label, site_name, accent, bg, h, text_w, left=70):
+    """左側にラベル・キャッチコピー（マーカー付き）・サイト名を描く。"""
     label_font = _font(30)
     if label:
         lw = draw.textlength(label, font=label_font)
         draw.rounded_rectangle((left, 80, left + lw + 48, 132), radius=26, fill=accent)
         draw.text((left + 24, 88), label, font=label_font, fill="white")
 
-    # キャッチコピー（大きく、マーカー付き）
     lines = [l for l in copy.replace("/", "／").split("／") if l] or [copy]
     if len(lines) == 1:
         lines = _wrap(copy, 10)
@@ -88,13 +169,8 @@ def make_eyecatch(copy: str, label: str, illustration: str, site_name: str) -> b
         draw.rounded_rectangle((left - 6, y + size * 0.62, left + tw + 6, y + size * 1.08), radius=8, fill=marker)
         draw.text((left, y), line, font=font, fill="#3B3330")
 
-    # サイト名（左下）
     small = _font(24, bold=False)
     draw.text((left, h - 75), site_name, font=small, fill=_mix("#3B3330", bg, 0.35))
-
-    buf = io.BytesIO()
-    img.convert("RGB").save(buf, "PNG", optimize=True)
-    return buf.getvalue()
 
 
 def _wrap(text: str, width: int) -> list[str]:

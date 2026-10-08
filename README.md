@@ -7,7 +7,7 @@ Claude（AI）が保育士転職ブログ（happyhoiku-tenshoku.com）の記事�
 1. GitHub Actions が決まった時間に `scripts/auto_post.py` を実行します
 2. `content/keywords.csv`（KW選定シート）から、`執筆済み` が空のキーワードを **優先度の高い順（最高→高→中）** に1つ選びます
 3. そのキーワードの検索意図・推奨記事タイプ・備考と、`content/blog_profile.md` の方針に沿って Claude が記事を書きます。既存記事への内部リンクも入れます
-4. タイトル入りのアイキャッチ画像を作り、本文には Pexels の無料写真を2〜3枚入れて、WordPress に **下書き** として保存します（タグも自動で付きます）
+4. キャッチコピー入りのアイキャッチ（Google の画像生成 AI による写真風画像）を作り、本文には Pexels の無料写真を2〜3枚入れて、WordPress に **下書き** として保存します（タグも自動で付きます）
 5. `keywords.csv` の `執筆済み` に日付、`URL` に記事URLが入り、`content/posted.tsv` に投稿履歴が残ります
 
 未執筆のキーワードがなくなったら、AI が既存記事と重ならないテーマを自分で選びます。
@@ -32,6 +32,7 @@ https://platform.claude.com/ で API キーを発行します（記事1本あた
 | `WP_USER` | WordPress のユーザー名 |
 | `WP_APP_PASSWORD` | 手順1のアプリケーションパスワード |
 | `PEXELS_API_KEY` | （任意）Pexels の API キー。登録すると本文に写真が入ります |
+| `GEMINI_API_KEY` | （任意）Google の API キー。登録するとアイキャッチが AI の写真風画像になります |
 
 > パスワードやキーは GitHub 上で暗号化して保存され、登録後は本人も含めて誰も中身を見られません。Claude に伝える必要もありません。
 > アプリケーションパスワードは WordPress のログインパスワードとは別物で、不要になったらプロフィール画面からいつでも取り消せます。
@@ -42,6 +43,11 @@ https://platform.claude.com/ で API キーを発行します（記事1本あた
 | --- | --- |
 | `WP_POST_STATUS` | `draft`（下書きに保存・既定）または `publish`（すぐ公開） |
 | `WP_CATEGORY_ID` | 投稿先カテゴリーの ID（複数はカンマ区切り） |
+
+### Google の API キー（任意・有料）
+アイキャッチを AI の写真風画像にするために使います。https://aistudio.google.com/ で「Get API key」からキーを作り、課金（請求先アカウント）を有効にしてください。画像1枚ごとに数円〜十数円程度かかります（最新の料金は Google の料金ページで確認してください）。
+登録しない場合は、Pexels の写真、それもなければイラストのアイキャッチになります。
+使う画像生成モデルは Variables の `GEMINI_IMAGE_MODEL` で変えられます（既定: `imagen-4.0-generate-001`）。
 
 ### Pexels の API キー（任意・無料）
 https://www.pexels.com/ja-jp/api/ でアカウントを作り、「API キーを取得」から発行します。登録しない場合はアイキャッチ画像だけが付きます。

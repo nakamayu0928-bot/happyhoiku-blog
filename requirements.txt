@@ -3,3 +3,4 @@ pydantic>=2
 requests>=2.31
 Pillow>=10
 cairosvg>=2.7
+google-genai>=1.0

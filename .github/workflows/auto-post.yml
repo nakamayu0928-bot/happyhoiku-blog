@@ -41,6 +41,8 @@ jobs:
           WP_POST_STATUS: ${{ vars.WP_POST_STATUS }}
           WP_CATEGORY_ID: ${{ vars.WP_CATEGORY_ID }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
         run: python scripts/auto_post.py ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: 確認用の記事と画像を保存

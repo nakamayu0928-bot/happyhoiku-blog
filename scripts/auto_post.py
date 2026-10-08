@@ -15,6 +15,7 @@
     WP_POST_STATUS      draft（下書き, 既定）/ publish（すぐ公開）
     WP_CATEGORY_ID      投稿先カテゴリーの ID（カンマ区切りで複数可）
     PEXELS_API_KEY      Pexels の API キー（あると本文に写真が入る）
+    GEMINI_API_KEY      Google の API キー（あるとアイキャッチが AI の写真風画像になる）
 """
 
 import argparse
@@ -57,6 +58,7 @@ class Article(BaseModel):
     images: list[ImageSpec]
     eyecatch_copy: str
     eyecatch_label: str
+    eyecatch_scene: str
     illustration: Literal["mom_and_kids", "tired_night", "teacher", "checklist", "step_forward"]
 
 
@@ -131,7 +133,10 @@ def generate_article(kw: dict | None, rows: list[dict]) -> Article:
   - alt: 写真の説明（日本語・30文字以内）
 - eyecatch_copy: アイキャッチ画像に大きく入れる短いキャッチコピー。2行で、改行位置に「／」を入れる。1行10文字前後まで（例: 子持ち保育士の転職／勇気が出ない人へ）
 - eyecatch_label: アイキャッチ左上の小さなラベル（8文字以内。例: 保育士の転職、比較、悩み相談）
-- illustration: アイキャッチのイラスト。記事に一番合うものを選ぶ
+- eyecatch_scene: アイキャッチ用の写真風画像を AI に作らせるための、場面の説明（英語・1〜2文）。想定読者が「自分のことだ」と感じる、記事の内容に合った具体的な場面にする
+  （例: "A tired Japanese woman in her 30s sitting at a kitchen table late at night, looking at her smartphone, her two small children asleep in the background"）
+  - 実在の人物・有名人・ブランドは入れない。子どもは後ろ姿や遠景にする
+- illustration: 写真が用意できなかったときに使うイラスト。記事に一番合うものを選ぶ
   - mom_and_kids: ママと2人の子ども（子育てとの両立・子持ち・ワーママ）
   - tired_night: 夜にスマホを見て悩む女性（悩み・不安・疲れ・迷い）
   - teacher: エプロン姿の保育士と子ども（保育の仕事・職場・人間関係）
@@ -232,11 +237,22 @@ def site_name() -> str:
     return urlparse(os.environ.get("WP_URL", "")).netloc or "happyhoiku-tenshoku.com"
 
 
+def make_eyecatch_for(article: Article) -> bytes:
+    return make_eyecatch(
+        article.eyecatch_copy,
+        article.eyecatch_label,
+        site_name(),
+        scene=article.eyecatch_scene,
+        photo_query=article.images[0].search_query if article.images else "",
+        illustration=article.illustration,
+    )
+
+
 def post_to_wordpress(article: Article) -> dict:
     eyecatch = upload_media(
-        make_eyecatch(article.eyecatch_copy, article.eyecatch_label, article.illustration, site_name()),
-        f"{article.slug}-eyecatch.png",
-        "image/png",
+        make_eyecatch_for(article),
+        f"{article.slug}-eyecatch.jpg",
+        "image/jpeg",
         article.title,
     )
     data = {
@@ -260,16 +276,14 @@ def post_to_wordpress(article: Article) -> dict:
 
 def save_preview(article: Article) -> None:
     PREVIEW_DIR.mkdir(exist_ok=True)
-    (PREVIEW_DIR / "eyecatch.png").write_bytes(
-        make_eyecatch(article.eyecatch_copy, article.eyecatch_label, article.illustration, site_name())
-    )
+    (PREVIEW_DIR / "eyecatch.jpg").write_bytes(make_eyecatch_for(article))
     body = insert_photos(article, upload=False)
     (PREVIEW_DIR / "article.html").write_text(
         f"""<!doctype html><meta charset="utf-8"><title>{article.title}</title>
 <style>body{{max-width:760px;margin:2em auto;padding:0 16px;font-family:sans-serif;line-height:1.9;color:#333}}
 img{{max-width:100%}}table{{border-collapse:collapse}}td,th{{border:1px solid #ccc;padding:6px 10px}}
 figcaption{{font-size:12px;color:#888}}h2{{border-left:6px solid #F28C6B;padding-left:10px}}</style>
-<h1>{article.title}</h1><img src="eyecatch.png" alt="アイキャッチ">
+<h1>{article.title}</h1><img src="eyecatch.jpg" alt="アイキャッチ">
 <p style="color:#888">タグ: {", ".join(article.tags)}<br>要約: {article.excerpt}</p>
 {body}""",
         encoding="utf-8",
