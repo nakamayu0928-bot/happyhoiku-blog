@@ -1,0 +1,15 @@
+---
+import { SITE } from '../data/site';
+
+// AdSense の広告ユニットID。審査通過後に管理画面で作成して設定する。
+const slot = import.meta.env.PUBLIC_ADSENSE_SLOT ?? '';
+---
+{SITE.adsenseClient && slot && (
+  <div class="ad">
+    <ins class="adsbygoogle" style="display:block" data-ad-client={SITE.adsenseClient} data-ad-slot={slot} data-ad-format="auto" data-full-width-responsive="true"></ins>
+    <script is:inline>(window.adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+)}
+<style>
+  .ad { margin: 32px 0; min-height: 100px; }
+</style>

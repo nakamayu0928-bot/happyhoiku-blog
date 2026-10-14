@@ -1,0 +1,38 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PrNotice from '../../components/PrNotice.astro';
+import AffiliateBox from '../../components/AffiliateBox.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { getPublishedPosts } from '../../lib/posts';
+import { SITE } from '../../data/site';
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  return posts.map((post) => ({ params: { id: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const d = post.data;
+const fmt = (date: Date) => date.toLocaleDateString('ja-JP');
+const showPr = d.hasAffiliate || d.affiliates.length > 0;
+---
+<BaseLayout title={d.title} description={d.description}>
+  <article>
+    {showPr && <PrNotice />}
+    <p class="meta">{d.category} ・ {fmt(d.pubDate)}{d.updatedDate && ` (更新 ${fmt(d.updatedDate)})`}</p>
+    <h1>{d.title}</h1>
+    <Content />
+    <AdSlot />
+    {d.affiliates.map((id) => <AffiliateBox id={id} />)}
+    <p class="byline">執筆・監修: {SITE.author}</p>
+  </article>
+</BaseLayout>
+<style>
+  h1 { font-size: 1.6rem; line-height: 1.5; margin-top: 4px; }
+  .meta { color: var(--muted); font-size: .85rem; margin: 12px 0 0; }
+  .byline { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 40px; }
+  article :global(h2) { border-left: 5px solid var(--accent); padding-left: 10px; margin-top: 2.4em; }
+  article :global(img) { max-width: 100%; height: auto; }
+</style>

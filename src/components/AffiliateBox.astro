@@ -1,0 +1,21 @@
+---
+import { AFFILIATES } from '../data/affiliates';
+
+interface Props { id: string }
+const item = AFFILIATES[Astro.props.id];
+---
+{item && item.href && (
+  <aside class="aff">
+    <span class="label">PR</span>
+    <p class="name">{item.name}</p>
+    <p class="catch">{item.catch}</p>
+    <a href={item.href} rel="sponsored noopener" target="_blank">公式サイトを見る</a>
+  </aside>
+)}
+<style>
+  .aff { border: 2px solid var(--accent); border-radius: 12px; padding: 16px 18px; margin: 28px 0; background: var(--card); position: relative; }
+  .label { position: absolute; top: -11px; left: 14px; background: var(--accent); color: #fff; font-size: .7rem; padding: 1px 8px; border-radius: 4px; }
+  .name { font-weight: 700; margin: 0; }
+  .catch { margin: 4px 0 12px; color: var(--muted); font-size: .9rem; }
+  a { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; padding: 8px 18px; border-radius: 999px; font-weight: 700; }
+</style>

@@ -1,0 +1,81 @@
+---
+import { SITE, url } from '../data/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+const { title, description = SITE.description } = Astro.props;
+const fullTitle = title ? `${title} | ${SITE.title}` : SITE.title;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="application/rss+xml" title={SITE.title} href={url('rss.xml')} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    {SITE.adsenseClient && (
+      <script
+        async
+        src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${SITE.adsenseClient}`}
+        crossorigin="anonymous"
+      ></script>
+    )}
+    <style is:global>
+      :root {
+        --bg: #fffdf8;
+        --fg: #33302b;
+        --muted: #7a7266;
+        --accent: #e8825a;
+        --card: #ffffff;
+        --line: #eee6da;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+        line-height: 1.9;
+      }
+      a { color: var(--accent); }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+      header.site { border-bottom: 1px solid var(--line); background: var(--card); }
+      header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 14px; flex-wrap: wrap; }
+      header.site a.logo { color: var(--fg); font-weight: 700; font-size: 1.2rem; text-decoration: none; }
+      header.site nav a { margin-left: 14px; color: var(--muted); text-decoration: none; font-size: .9rem; }
+      main { padding-block: 32px; }
+      footer.site { border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; padding-block: 24px; }
+      footer.site a { color: var(--muted); margin-right: 14px; }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="logo" href={url('/')}>{SITE.title}</a>
+        <nav>
+          <a href={url('about/')}>運営者情報</a>
+          <a href={url('contact/')}>お問い合わせ</a>
+        </nav>
+      </div>
+    </header>
+    <main class="wrap">
+      <slot />
+    </main>
+    <footer class="site">
+      <div class="wrap">
+        <a href={url('privacy/')}>プライバシーポリシー・免責事項</a>
+        <a href={url('about/')}>運営者情報</a>
+        <p>© {new Date().getFullYear()} {SITE.title}</p>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getPublishedPosts } from '../lib/posts';
+import { SITE, url } from '../data/site';
+
+const posts = await getPublishedPosts();
+---
+<BaseLayout>
+  <p class="lead">{SITE.description}</p>
+  {posts.length === 0 && <p>記事を準備中です。</p>}
+  <ul class="list">
+    {posts.map((p) => (
+      <li>
+        <a href={url(`posts/${p.id}/`)}>
+          <span class="cat">{p.data.category}</span>
+          <span class="t">{p.data.title}</span>
+          <span class="d">{p.data.description}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</BaseLayout>
+<style>
+  .lead { color: var(--muted); }
+  .list { list-style: none; padding: 0; display: grid; gap: 14px; }
+  .list a { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; color: var(--fg); text-decoration: none; }
+  .cat { font-size: .75rem; color: var(--accent); font-weight: 700; }
+  .t { display: block; font-weight: 700; font-size: 1.05rem; }
+  .d { display: block; color: var(--muted); font-size: .85rem; margin-top: 4px; }
+</style>
