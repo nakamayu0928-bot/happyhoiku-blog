@@ -1,0 +1,54 @@
+name: SNS auto post
+
+on:
+  schedule:
+    # 保育士が見やすい昼休み 12:15 と夜 21:15（日本時間）。cron は UTC
+    - cron: '15 3 * * *'
+    - cron: '15 12 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '投稿せずに内容だけ確認する'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sns-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Post
+        run: node scripts/sns-post.mjs ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          SITE_URL: ${{ vars.SITE_URL || format('https://{0}.github.io/{1}/', github.repository_owner, github.event.repository.name) }}
+          RESHARE_DAYS: ${{ vars.SNS_RESHARE_DAYS || '30' }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+      - name: Save post log
+        # 一部のSNSで失敗しても、成功した分の記録は残す（二重投稿防止）
+        if: always()
+        run: |
+          git diff --quiet sns/posted.json && exit 0
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add sns/posted.json
+          git commit -m 'SNS投稿ログを更新'
+          git push

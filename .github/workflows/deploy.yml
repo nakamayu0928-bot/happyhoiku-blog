@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    paths-ignore: ['sns/posted.json']
   workflow_dispatch:
 
 permissions:
@@ -25,6 +26,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check:articles
+      - run: npm run check:sns
       - id: pages
         uses: actions/configure-pages@v5
       - run: npm run build

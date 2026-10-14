@@ -7,7 +7,9 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check:articles": "node scripts/check-articles.mjs"
+    "check:articles": "node scripts/check-articles.mjs",
+    "check:sns": "node scripts/sns-post.mjs --check",
+    "sns:dry-run": "node scripts/sns-post.mjs --dry-run"
   },
   "dependencies": {
     "@astrojs/rss": "4.0.12",

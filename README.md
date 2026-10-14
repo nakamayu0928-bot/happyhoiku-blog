@@ -4,6 +4,7 @@
 
 - 運用ルールとAI編集部の一覧: [`CLAUDE.md`](CLAUDE.md)
 - 収益化ロードマップ: [`docs/monetization.md`](docs/monetization.md)
+- SNS自動投稿の設定: [`docs/sns-setup.md`](docs/sns-setup.md)
 
 ## 使い方
 
@@ -24,5 +25,6 @@ Claude Code で:
 1. AI編集部が `src/content/posts/<slug>.md` を `draft: true` で作る
 2. 運営者が `<!-- 体験談 -->` を埋め、内容を確認
 3. `humanReviewed: true` と `draft: false` にして main に push → GitHub Pages に自動公開
+4. その日の 12:15 / 21:15 に X・Threads・Bluesky へ自動投稿（30日後から別の文面で再シェア）
 
 初回のみ: リポジトリの Settings → Pages → Source を「GitHub Actions」にする。

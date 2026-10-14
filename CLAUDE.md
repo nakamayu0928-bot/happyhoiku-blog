@@ -16,12 +16,19 @@
 | 7 | proofreader | 校正・AIっぽさ除去 |
 | 8 | seo-optimizer | frontmatter・内部リンク・記事ファイル化 |
 | 9 | monetization-planner | アフィリエイト配置・PR表記・収益計画 |
-| 10 | sns-promoter | X / Instagram / Pinterest / Threads 投稿文 |
+| 10 | sns-promoter | SNS投稿文（X / Threads / Bluesky は自動投稿、Instagram / Pinterest は手動用） |
 
 コマンド:
 - `/new-article <テーマ>` — 1本つくる（1→2→3→6→7→8→9/10）
 - `/monthly-plan [YYYY-MM]` — 月間の記事計画
 - `/rewrite <slug>` — 既存記事のリライト
+
+## SNS自動投稿
+- `sns/<slug>.json` の投稿文を、`.github/workflows/sns.yml` が毎日 12:15 / 21:15（JST）に X・Threads・Bluesky へ投稿する
+- 対象は公開済み（`draft: false` かつ `humanReviewed: true`）の記事だけ。1回の実行で各SNS1件まで
+- 新着がない日は、最後の投稿から30日以上たった記事を別パターンの文面で再シェアする
+- 投稿履歴は `sns/posted.json`（Actions が自動コミット。手で編集しない）
+- 設定方法: `docs/sns-setup.md`
 
 中間成果物は `drafts/<slug>/`（gitで管理。どのAIが何をしたか追えるように）。
 
@@ -41,4 +48,6 @@
 
 ## 確認コマンド
 - `npm run check:articles` — 記事のルール違反チェック
+- `npm run check:sns` — SNS投稿文の文字数チェック
+- `npm run sns:dry-run` — 次に何が投稿されるか確認
 - `npm run build` — 本番ビルド

@@ -34,7 +34,7 @@
 ### フェーズ2: 記事30本（3〜6か月）
 - アドセンス申請（`.env` に `PUBLIC_ADSENSE_CLIENT` / `PUBLIC_ADSENSE_SLOT`）
 - `/rewrite` で順位11〜30位の記事をテコ入れ（Search Console で確認）
-- SNS（sns-promoter の投稿文）で初期流入を作る。Pinterest は製作記事と相性が良い
+- SNS自動投稿（`docs/sns-setup.md`）で初期流入を作る。Pinterest は製作記事と相性が良いので手動で
 
 ### フェーズ3: 記事50本〜
 - 読まれている記事から有料テンプレ・素材集へ誘導
@@ -44,7 +44,7 @@
 1. `/new-article` を2〜4回（AIが下書き〜SNS文まで作る）
 2. 各記事の `<!-- 体験談 -->` を埋める・「要人間確認」を確認する（ここが他サイトとの差になる）
 3. `humanReviewed: true`, `draft: false` にして push → 自動公開
-4. SNS投稿（`drafts/<slug>/08-sns.md` をコピペ）
+4. SNS: X / Threads / Bluesky は自動。Instagram・Pinterest だけ `drafts/<slug>/08-sns.md` から手動
 
 ## 費用
 - サーバー: 0円（GitHub Pages）

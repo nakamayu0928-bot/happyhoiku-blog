@@ -17,15 +17,15 @@ argument-hint: <記事テーマ 例: 保育士 転職 タイミング>
 5. **proofreader** — 校正 → `05-edited.md`
 6. **seo-optimizer** — frontmatter・内部リンクを付けて `src/content/posts/<slug>.md` を作成
 7. **monetization-planner** — アフィリエイト配置・PR表記 → `07-monetize.md`
-8. **sns-promoter** — SNS投稿文 → `08-sns.md`
+8. **sns-promoter** — SNS投稿文 → `08-sns.md` と自動投稿用 `sns/<slug>.json`
 
 7 と 8 は並列で走らせてよい。
 
-最後に `npm run check:articles` を実行し、問題があれば直してください。
+最後に `npm run check:articles` と `npm run check:sns` を実行し、問題があれば直してください。
 
 ## 編集長としての最終報告（運営者向け）
 以下を短くまとめて報告する:
 - 記事タイトルとファイルパス
 - **運営者がやること**: `<!-- 体験談 -->` の加筆箇所数、ファクトチェックで「要人間確認」になった項目
 - 収益化メモ（貼った案件 / 提携すべき案件）
-- 公開手順: 確認・加筆が終わったら frontmatter の `humanReviewed: true` と `draft: false` にする
+- 公開手順: 確認・加筆が終わったら frontmatter の `humanReviewed: true` と `draft: false` にする（公開後、X/Threads/Bluesky には自動で投稿される。Instagram・Pinterest は `08-sns.md` から手動）
