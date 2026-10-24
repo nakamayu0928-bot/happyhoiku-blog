@@ -5,7 +5,7 @@ description: 有料note記事の下書きを作る。テーマを受け取り、
 
 # note記事の下書き作成
 
-引数：記事のテーマ（例：「メール作成をAIで時短」）
+引数：記事のテーマ（例：「VLOOKUPをAIに作ってもらう」）
 
 ## 手順
 1. `brand/persona.md`、`brand/voice.md`、`brand/products.md`、`templates/note-paid.md` を読む
